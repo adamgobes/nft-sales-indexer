@@ -1,0 +1,18 @@
+enum SaleType {
+  Single,
+  Bundle
+}
+
+type Sale @entity {
+  id: ID!
+  nftContractAddress: Bytes!
+  nftTokenId: String!
+  saleType: SaleType
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  seller: Bytes!
+  buyer: Bytes!
+  exchange: Bytes!
+  paymentToken: Bytes!
+  price: BigInt!
+}
