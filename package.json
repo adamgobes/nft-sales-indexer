@@ -4,7 +4,8 @@
   "scripts": {
     "codegen": "graph codegen",
     "build": "graph build",
-    "deploy-studio": "graph deploy --studio eip721-sales-indexer"
+    "deploy-studio": "graph deploy --studio eip721-sales-indexer",
+    "deploy": "graph deploy --product hosted-service adamgobes/eip721-sales"
   },
   "dependencies": {
     "@graphprotocol/graph-cli": "0.23.1",
