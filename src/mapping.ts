@@ -1,9 +1,10 @@
 import { Address, BigInt, Bytes, ByteArray, log } from "@graphprotocol/graph-ts"
 import {
-  AtomicMatch_Call
+  AtomicMatch_Call,
+  WyvernExchange
 } from "../generated/WyvernExchange/WyvernExchange"
 import { Sale } from "../generated/schema"
-import { WYVERN_ATOMICIZER_ADDRESS } from "./constants";
+import { WYVERN_ATOMICIZER_ADDRESS, WYVERN_EXCHANGE_ADDRESS } from "./constants";
 
 class NFT {
   constructor(public contractAddress: Bytes, public tokenId: string) {
@@ -67,10 +68,11 @@ function _handleSingleAssetSale(call: AtomicMatch_Call): void {
   let paymentTokenErc20Address: Address = addrs[6];
 
   // Merge sell order data with buy order data (just like they are doing in their contract)
-  let mergedCallDataStr = _guardedArrayReplace(callInputs.calldataBuy, callInputs.calldataSell, callInputs.replacementPatternBuy);
+  let wyvernExchange = WyvernExchange.bind(Address.fromString(WYVERN_EXCHANGE_ADDRESS))
+  let mergedCallData = wyvernExchange.guardedArrayReplace(callInputs.calldataBuy, callInputs.calldataSell, callInputs.replacementPatternBuy);
 
   // Fetch the token ID that has been sold from the call data 
-  let tokenId = _getSingleTokenIdFromTransferFromCallData(mergedCallDataStr, true);
+  let tokenId = _getSingleTokenIdFromTransferFromCallData(mergedCallData.toHexString(), true);
 
   // Create the Sale
   let saleId = call.transaction.hash.toHexString();
@@ -106,10 +108,11 @@ function _handleBundleSale(call: AtomicMatch_Call): void {
   let paymentTokenErc20Address: Address = addrs[6];
 
   // Merge sell order data with buy order data (just like they are doing in their contract)
-  let mergedCallDataStr = _guardedArrayReplace(callInputs.calldataBuy, callInputs.calldataSell, callInputs.replacementPatternBuy);
+  let wyvernExchange = WyvernExchange.bind(Address.fromString(WYVERN_EXCHANGE_ADDRESS))
+  let mergedCallData = wyvernExchange.guardedArrayReplace(callInputs.calldataBuy, callInputs.calldataSell, callInputs.replacementPatternBuy);
 
   // Fetch the token IDs list that has been sold from the call data for this bundle sale
-  let completeNfts = _getCompleteNftIdFromCallData(mergedCallDataStr);
+  let completeNfts = _getCompleteNftIdFromCallData(mergedCallData);
 
   for (let i = 0; i < completeNfts.length; i++) {
     let completeNftId = completeNfts[i];
@@ -162,21 +165,21 @@ function _guardedArrayReplace(array: Bytes, replacement: Bytes, mask: Bytes): st
  *                          to trigger bundle sales (looping over NFT and calling transferFrom for each)
  * @returns The list of associated full name NFT in the bundle
  */
-function _getCompleteNftIdFromCallData(atomicizeCallData: string): NFT[] {
+function _getCompleteNftIdFromCallData(atomicizeCallData: Bytes): NFT[] {
   const TRAILING_0x = 2;
   const METHOD_ID_LENGTH = 8;
   const UINT_256_LENGTH = 64;
 
   let indexStartNbToken = TRAILING_0x + METHOD_ID_LENGTH + UINT_256_LENGTH * 4;
   let indexStopNbToken = indexStartNbToken + UINT_256_LENGTH;
-  let nbTokenStr = atomicizeCallData.substring(indexStartNbToken, indexStopNbToken);
+  let nbTokenStr = atomicizeCallData.toHexString().substring(indexStartNbToken, indexStopNbToken);
   let nbToken = i32(parseInt(nbTokenStr, 16))
 
   // Get the associated NFT contracts
   let nftContractsAddrsList: string[] = [];
   let offset = indexStopNbToken;
   for (let i = 0; i < nbToken; i++) {
-    let addrs = atomicizeCallData.substring(offset, offset + UINT_256_LENGTH);
+    let addrs = atomicizeCallData.toHexString().substring(offset, offset + UINT_256_LENGTH);
     nftContractsAddrsList.push(addrs);
 
     // Move forward in the call data
@@ -201,7 +204,7 @@ function _getCompleteNftIdFromCallData(atomicizeCallData: string): NFT[] {
   const TRANSFER_FROM_DATA_LENGTH = METHOD_ID_LENGTH + UINT_256_LENGTH * 3;
   let tokenIdsList: string[] = [];
   for (let i = 0; i < nbToken; i++) {
-    let transferFromData = atomicizeCallData.substring(offset, offset + TRANSFER_FROM_DATA_LENGTH);
+    let transferFromData = atomicizeCallData.toHexString().substring(offset, offset + TRANSFER_FROM_DATA_LENGTH);
     let tokenIdstr = _getSingleTokenIdFromTransferFromCallData(transferFromData, false);
     tokenIdsList.push(tokenIdstr);
 
@@ -246,8 +249,9 @@ function _getSingleTokenIdFromTransferFromCallData(transferFromData: string, tra
    * +2 | 0 chars for the "0x" leading part
    */
 
-  let tokenIdHexStr: string = transferFromData.substring(TRAILING_0x + METHOD_ID_LENGTH + UINT_256_LENGTH * 2);
-  let tokenId = parseInt(tokenIdHexStr, 16).toString()
+  let tokenIdHex = transferFromData.substring(TRAILING_0x + METHOD_ID_LENGTH + UINT_256_LENGTH * 2);
+
+  let tokenId = parseInt(tokenIdHex.toString(), 16).toString()
 
   return tokenId.substring(0, tokenId.indexOf("."));
 }
