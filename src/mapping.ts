@@ -1,7 +1,8 @@
 import { Address, BigInt, Bytes, ByteArray, log } from "@graphprotocol/graph-ts"
 import {
   AtomicMatch_Call,
-  WyvernExchange
+  AtomicMatch_Call__Inputs,
+  WyvernExchange,
 } from "../generated/WyvernExchange/WyvernExchange"
 import { Sale } from "../generated/schema"
 import { WYVERN_ATOMICIZER_ADDRESS, WYVERN_EXCHANGE_ADDRESS } from "./constants";
@@ -59,7 +60,9 @@ function _handleSingleAssetSale(call: AtomicMatch_Call): void {
   let addrs: Address[] = callInputs.addrs;
   let uints: BigInt[] = callInputs.uints;
 
-  let price: BigInt = uints[4];
+  let wyvernExchange = WyvernExchange.bind(Address.fromString(WYVERN_EXCHANGE_ADDRESS))
+
+  let price: BigInt = _getMatchPriceOfSale(wyvernExchange, callInputs)
 
   let nftAddrs: Address = addrs[4];
 
@@ -67,9 +70,8 @@ function _handleSingleAssetSale(call: AtomicMatch_Call): void {
   let sellerAdress: Address = addrs[8]; // Saler.maker
   let paymentTokenErc20Address: Address = addrs[6];
 
-  // Merge sell order data with buy order data (just like they are doing in their contract)
-  let wyvernExchange = WyvernExchange.bind(Address.fromString(WYVERN_EXCHANGE_ADDRESS))
-  let mergedCallData = wyvernExchange.guardedArrayReplace(callInputs.calldataBuy, callInputs.calldataSell, callInputs.replacementPatternBuy);
+  let mergedCallData = _guardedArrayReplace(wyvernExchange, callInputs)
+  if (!mergedCallData) return
 
   // Fetch the token ID that has been sold from the call data 
   let tokenId = _getSingleTokenIdFromTransferFromCallData(mergedCallData.toHexString(), true);
@@ -100,16 +102,16 @@ function _handleBundleSale(call: AtomicMatch_Call): void {
   let addrs: Address[] = callInputs.addrs;
   let uints: BigInt[] = callInputs.uints;
 
-  // TODO: The price should be retrieved from the calculateMatchPrice_ method of OpenSea Smart Contract
-  let price: BigInt = uints[4];
+  let wyvernExchange = WyvernExchange.bind(Address.fromString(WYVERN_EXCHANGE_ADDRESS))
+
+  let price: BigInt = _getMatchPriceOfSale(wyvernExchange, callInputs)
 
   let buyerAdress: Address = addrs[1]; // Buyer.maker
   let sellerAdress: Address = addrs[8]; // Saler.maker
   let paymentTokenErc20Address: Address = addrs[6];
 
-  // Merge sell order data with buy order data (just like they are doing in their contract)
-  let wyvernExchange = WyvernExchange.bind(Address.fromString(WYVERN_EXCHANGE_ADDRESS))
-  let mergedCallData = wyvernExchange.guardedArrayReplace(callInputs.calldataBuy, callInputs.calldataSell, callInputs.replacementPatternBuy);
+  let mergedCallData = _guardedArrayReplace(wyvernExchange, callInputs)
+  if (!mergedCallData) return
 
   // Fetch the token IDs list that has been sold from the call data for this bundle sale
   let completeNfts = _getCompleteNftIdFromCallData(mergedCallData);
@@ -138,25 +140,35 @@ function _handleBundleSale(call: AtomicMatch_Call): void {
 /**
  * Replace bytes in an array with bytes in another array, guarded by a bitmask
  *
- * @param array The original array
- * @param replacement The replacement array
- * @param mask The mask specifying which bits can be changed in the original array
- * @returns The updated byte array
+ * @param wyvernExchange WyvernExchange contract
+ * @param callInputs inputs to original AtomicMatch contract call to pass through
+ * @returns The updated byte array or null if contract call was reverted
  */
-function _guardedArrayReplace(array: Bytes, replacement: Bytes, mask: Bytes): string {
-  array.reverse();
-  replacement.reverse();
-  mask.reverse();
+function _guardedArrayReplace(wyvernExchange: WyvernExchange, callInputs: AtomicMatch_Call__Inputs): Bytes | null {
+  // Merge sell order data with buy order data (just like they are doing in their contract)
+  let mergedCallData: Bytes
+  let mergedCallDataTxResult = wyvernExchange.try_guardedArrayReplace(callInputs.calldataBuy, callInputs.calldataSell, callInputs.replacementPatternBuy);
+  if (mergedCallDataTxResult.reverted) {
+    return null // cannot continue with the entity if guardedArrayReplace fails, so just return
+  } else {
+    return mergedCallDataTxResult.value
+  }
+}
 
-  let bigIntgArray = BigInt.fromUnsignedBytes(array);
-  let bigIntReplacement = BigInt.fromUnsignedBytes(replacement);
-  let bigIntMask = BigInt.fromUnsignedBytes(mask);
-
-  // array |= replacement & mask;
-  bigIntReplacement = bigIntReplacement.bitAnd(bigIntMask);
-  bigIntgArray = bigIntgArray.bitOr(bigIntReplacement);
-  let callDataHexString = bigIntgArray.toHexString();
-  return callDataHexString;
+/**
+ * Replace bytes in an array with bytes in another array, guarded by a bitmask
+ *
+ * @param wyvernExchange WyvernExchange contract
+ * @param callInputs inputs to original AtomicMatch contract call to pass through
+ * @returns The price at which the sale occured in the native payment token
+ */
+function _getMatchPriceOfSale(wyvernExchange: WyvernExchange, callInputs: AtomicMatch_Call__Inputs): BigInt {
+  let priceTxResult = wyvernExchange.try_calculateMatchPrice_(callInputs.addrs, callInputs.uints, callInputs.feeMethodsSidesKindsHowToCalls, callInputs.calldataBuy, callInputs.calldataSell, callInputs.replacementPatternBuy, callInputs.replacementPatternSell, callInputs.staticExtradataBuy, callInputs.staticExtradataSell)
+  if (priceTxResult.reverted) {
+    return callInputs.uints[4] // fall back to default match price (may be incorrect in case of timed auction)
+  } else {
+    return priceTxResult.value
+  }
 }
 
 /**
