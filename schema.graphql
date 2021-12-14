@@ -9,7 +9,7 @@ type Sale @entity {
   nftTokenId: String!
   saleType: SaleType
   blockNumber: BigInt!
-  timestamp: BigInt!
+  timestamp: Int!
   seller: Bytes!
   buyer: Bytes!
   exchange: Bytes!

@@ -19,7 +19,7 @@ export class Sale extends Entity {
     this.set("nftContractAddress", Value.fromBytes(Bytes.empty()));
     this.set("nftTokenId", Value.fromString(""));
     this.set("blockNumber", Value.fromBigInt(BigInt.zero()));
-    this.set("timestamp", Value.fromBigInt(BigInt.zero()));
+    this.set("timestamp", Value.fromI32(0));
     this.set("seller", Value.fromBytes(Bytes.empty()));
     this.set("buyer", Value.fromBytes(Bytes.empty()));
     this.set("exchange", Value.fromBytes(Bytes.empty()));
@@ -97,13 +97,13 @@ export class Sale extends Entity {
     this.set("blockNumber", Value.fromBigInt(value));
   }
 
-  get timestamp(): BigInt {
+  get timestamp(): i32 {
     let value = this.get("timestamp");
-    return value!.toBigInt();
+    return value!.toI32();
   }
 
-  set timestamp(value: BigInt) {
-    this.set("timestamp", Value.fromBigInt(value));
+  set timestamp(value: i32) {
+    this.set("timestamp", Value.fromI32(value));
   }
 
   get seller(): Bytes {

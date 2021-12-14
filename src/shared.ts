@@ -18,7 +18,7 @@ export function _createSaleEntityFromParams(
     sale.saleType = saleType;
     sale.exchange = Address.fromString(exchange)
     sale.blockNumber = block.number;
-    sale.timestamp = block.timestamp;
+    sale.timestamp = block.timestamp.toI32();
     sale.buyer = buyer;
     sale.seller = seller;
     sale.paymentToken = paymentToken;
