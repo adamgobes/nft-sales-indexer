@@ -1,11 +1,11 @@
-import { Address, BigInt, Bytes, ByteArray, log } from "@graphprotocol/graph-ts"
+import { Address, BigInt, Bytes } from "@graphprotocol/graph-ts"
 import {
   AtomicMatch_Call,
   AtomicMatch_Call__Inputs,
   WyvernExchange,
 } from "../generated/WyvernExchange/WyvernExchange"
-import { Sale } from "../generated/schema"
 import { WYVERN_ATOMICIZER_ADDRESS, WYVERN_EXCHANGE_ADDRESS } from "./constants";
+import { _createSaleEntityFromParams } from "./shared";
 
 class NFT {
   constructor(public contractAddress: Bytes, public tokenId: string) {
@@ -78,17 +78,7 @@ function _handleSingleAssetSale(call: AtomicMatch_Call): void {
 
   // Create the Sale
   let saleId = call.transaction.hash.toHexString();
-  let sale = new Sale(saleId);
-  sale.saleType = "Single";
-  sale.blockNumber = call.block.number;
-  sale.timestamp = call.block.timestamp;
-  sale.buyer = buyerAdress;
-  sale.seller = sellerAdress;
-  sale.paymentToken = paymentTokenErc20Address;
-  sale.price = price;
-  sale.nftContractAddress = nftAddrs
-  sale.nftTokenId = tokenId
-  sale.save();
+  _createSaleEntityFromParams(saleId, "Single", WYVERN_EXCHANGE_ADDRESS, call.block, buyerAdress, sellerAdress, paymentTokenErc20Address, price, nftAddrs, tokenId)
 }
 
 /**
@@ -120,21 +110,8 @@ function _handleBundleSale(call: AtomicMatch_Call): void {
     let completeNftId = completeNfts[i];
     // Create the sale
     let saleId = `${call.transaction.hash.toHexString()}<>${completeNftId.contractAddress.toHexString()}<>${completeNftId.tokenId}`;
-    let sale = new Sale(saleId);
-
-    sale.saleType = "Bundle";
-    sale.blockNumber = call.block.number;
-    sale.timestamp = call.block.timestamp;
-    sale.buyer = buyerAdress;
-    sale.seller = sellerAdress;
-    sale.paymentToken = paymentTokenErc20Address;
-    sale.price = price;
-    sale.nftContractAddress = completeNftId.contractAddress;
-    sale.nftTokenId = completeNftId.tokenId
-    sale.save();
+    _createSaleEntityFromParams(saleId, "Bundle", WYVERN_EXCHANGE_ADDRESS, call.block, buyerAdress, sellerAdress, paymentTokenErc20Address, price, completeNftId.contractAddress, completeNftId.tokenId)
   }
-
-
 }
 
 /**
