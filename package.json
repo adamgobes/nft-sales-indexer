@@ -2,7 +2,7 @@
   "name": "eip721-sales-indexer",
   "license": "UNLICENSED",
   "scripts": {
-    "codegen": "graph codegen",
+    "codegen": "graph codegen && git restore generated/WyvernExchange",
     "build": "graph build",
     "deploy-studio": "graph deploy --studio eip721-sales-indexer",
     "deploy": "graph deploy --product hosted-service adamgobes/nft-sales-indexer"

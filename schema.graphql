@@ -16,3 +16,9 @@ type Sale @entity {
   paymentToken: Bytes!
   price: BigInt!
 }
+
+type ZoraBid @entity {
+  id: ID!
+  amount: BigInt!
+  bidder: Bytes!
+}
